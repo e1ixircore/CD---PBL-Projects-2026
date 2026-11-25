@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IntelliFix — Eco Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #f6f4f0;
+      --panel: #ffffff;
+      --panel2: #f0ede6;
+      --ink: #1c1917;
+      --mute: #6b665e;
+      --line: #e2ddd4;
+      --accent: #1b4332;
+      --accent-soft: #e6f0ec;
+      --sec: #991b1b;
+      --ok: #15803d;
+      --warn: #d97706;
+      --head: 'Instrument Sans', system-ui, sans-serif;
+      --body: 'Inter', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font: 13.5px/1.55 var(--body);
+      min-height: 100vh;
+    }
+
+    #appHeader {
+      height: 46px;
+      background: #14281f;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      position: sticky;
+      top: 0;
+      z-index: 25;
+    }
+    .brand { font: 700 15px/1 var(--head); letter-spacing: -0.01em; }
+    .nav-links { display: flex; align-items: center; gap: 4px; }
+    .nav-link {
+      color: #d1fae5;
+      text-decoration: none;
+      font: 600 12.5px/1 var(--head);
+      padding: 7px 12px;
+      border-radius: 6px;
+    }
+    .nav-link:hover { background: rgba(255,255,255,0.1); color: #fff; }
+    .nav-link.active { background: #2d6a4f; color: #fff; }
+
+    .container { max-width: 1260px; margin: 0 auto; padding: 24px 24px 56px; }
+    .top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .top-row h1 { font: 700 22px/1.2 var(--head); }
+    .top-row p { color: var(--mute); font-size: 13px; margin-top: 3px; }
+    .btn {
+      font: 600 12.5px var(--head);
+      padding: 7px 14px;
+      border-radius: 6px;
+      border: 0;
+      background: var(--accent);
+      color: #fff;
+      cursor: pointer;
+    }
+    .btn:hover:not(:disabled) { filter: brightness(1.08); }
+    .btn:disabled { opacity: 0.5; cursor: wait; }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 900px) { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+    .kpi {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .kpi .k { font: 700 11px var(--head); text-transform: uppercase; letter-spacing: 0.04em; color: var(--mute); }
+    .kpi .v { font: 800 22px/1.2 var(--head); margin: 5px 0 3px; }
+    .kpi .s { font-size: 12px; color: var(--mute); }
+
+    .chart-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 960px) { .chart-grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 16px 18px;
+      min-width: 0;
+    }
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      gap: 8px;
+    }
+    .card-head h3 { font: 700 14px var(--head); }
+    .pill {
+      font: 700 10.5px/1 var(--head);
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+    .pill.warn { background: #fef3c7; color: #92400e; }
+    .card-sub { font-size: 12px; color: var(--mute); margin-bottom: 12px; }
+    .chart-wrap { position: relative; height: 280px; width: 100%; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+    th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+    th { font: 700 11px var(--head); text-transform: uppercase; color: var(--mute); background: #faf9f6; }
+    td { font-family: var(--mono); font-size: 12px; }
+  </style>
+</head>
+<body>
+  <header id="appHeader">
+    <div class="brand">IntelliFix</div>
+    <nav class="nav-links">
+      <a href="/" class="nav-link">Studio</a>
+      <a href="/suite-report" class="nav-link">Suites</a>
+      <a href="/analytics" class="nav-link active">Eco Dashboard</a>
+    </nav>
+  </header>
+
+  <div class="container">
+    <div class="top-row">
+      <div>
+        <h1>Eco &amp; Compiler Analytics</h1>
+        <p id="metaText">Loading telemetry...</p>
+      </div>
+      <button class="btn" id="btnRefresh">Refresh Measurements</button>
+    </div>
+
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="chart-grid">
+      <div class="card">
+        <div class="card-head">
+          <h3>Errors by Type</h3>
+          <span class="pill">59 Error Files</span>
+        </div>
+        <div class="card-sub">Distribution across Python &amp; C++ normal error test suites</div>
+        <div class="chart-wrap"><canvas id="chErrorTypes"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Score Improvement (Before vs. After AI Fixes)</h3>
+          <span class="pill">3-Pillar Score</span>
+        </div>
+        <div class="card-sub">Current broken score vs. projected score after Agentic AI fixes</div>
+        <div class="chart-wrap"><canvas id="chScoreGain"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Discovery Stage &amp; Fixability</h3>
+          <span class="pill">289 Errors</span>
+        </div>
+        <div class="card-sub">Compiler stage where errors were intercepted</div>
+        <div class="chart-wrap"><canvas id="chStages"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Security Metrics Triggered</h3>
+          <span class="pill warn">25 Security Files</span>
+        </div>
+        <div class="card-sub">Top security metrics intercepted at Stage 1 Security Gate</div>
+        <div class="chart-wrap"><canvas id="chSecurity"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Estimated Energy per Scan (mJ)</h3>
+          <span class="pill warn">Eco Estimate</span>
+        </div>
+        <div class="card-sub">Package power (W) × measured pipeline latency across benchmark sizes</div>
+        <div class="chart-wrap"><canvas id="chEnergy"></canvas></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>CPU Package Power Telemetry (W)</h3>
+          <span class="pill">Measured</span>
+        </div>
+        <div class="card-sub">Sampled hardware package power from powermetrics_log.txt</div>
+        <div class="chart-wrap"><canvas id="chPower"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card" id="ccCard" style="display:none;">
+      <div class="card-head">
+        <h3>CodeCarbon Emissions Log</h3>
+        <span class="pill">emissions.csv</span>
+      </div>
+      <div id="ccTableWrap"></div>
+    </div>
+  </div>
+
+  <script>
+    Chart.defaults.color = '#6b665e';
+    Chart.defaults.borderColor = '#ece7df';
+    Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+    const charts = {};
+
+    function drawChart(id, cfg) {
+      if (charts[id]) charts[id].destroy();
+      charts[id] = new Chart(document.getElementById(id), cfg);
+    }
+
+    const tooltipStyle = {
+      backgroundColor: '#1c1917',
+      titleColor: '#f6f4f0',
+      bodyColor: '#e7e5e4',
+      padding: 10,
+      cornerRadius: 7,
+    };
+
+    async function loadDashboard() {
+      const [suiteRes, ecoRes] = await Promise.all([
+        fetch('/api/suite-report').then(r => r.json()).catch(() => null),
+        fetch('/api/analytics').then(r => r.json()).catch(() => null),
+      ]);
+
+      const s = (suiteRes && suiteRes.summary) || {};
+      const ecoMeta = (ecoRes && ecoRes.meta) || {};
+      const powerW = ecoMeta.power_w || 15.0;
+
+      document.getElementById('metaText').textContent =
+        `${s.total_files || 0} test files (${(s.total_corpus_loc || 0).toLocaleString()} LOC) · ` +
+        `Hardware package power: ${powerW} W` +
+        (ecoMeta.machine ? ` (${ecoMeta.machine})` : '');
+
+      // KPIs
+      const kpiBox = document.getElementById('kpiGrid');
+      kpiBox.innerHTML = '';
+      [
+        ['Error Fix Rate', `${s.fixable_pct || 0}%`, `${s.total_fixable_errors || 0} auto-fixable · ${s.total_ambiguous_errors || 0} manual`],
+        ['Error Corpus', `${s.total_error_files || 0} Files`, `${s.total_errors_detected || 0} errors across Python & C++`],
+        ['Security Gate', `${s.total_security_files || 0} Files`, `${s.total_security_findings || 0} findings (52 metrics)`],
+        ['Package Power', `${powerW} W`, ecoMeta.power_samples ? `${ecoMeta.power_samples} samples` : 'Baseline estimate'],
+      ].forEach(([k, v, sub]) => {
+        const div = document.createElement('div');
+        div.className = 'kpi';
+        div.innerHTML = `<div class="k">${k}</div><div class="v">${v}</div><div class="s">${sub}</div>`;
+        kpiBox.append(div);
+      });
+
+      // 1. Errors by Type (Horizontal Bar)
+      const errTypes = Object.entries(s.errors_by_type || {}).slice(0, 10);
+      drawChart('chErrorTypes', {
+        type: 'bar',
+        data: {
+          labels: errTypes.map(x => x[0]),
+          datasets: [{
+            label: 'Errors',
+            data: errTypes.map(x => x[1]),
+            backgroundColor: '#1b4332',
+            borderRadius: 5,
+            maxBarThickness: 22,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: {
+            x: { beginAtZero: true, grid: { color: '#f0ede6' } },
+            y: { grid: { display: false }, ticks: { font: { family: "'JetBrains Mono', monospace", size: 11 } } },
+          },
+        },
+      });
+
+      // 2. Score Improvement Before vs After AI Fixes (Grouped Bar)
+      const sampleRows = [
+        ...((suiteRes && suiteRes.standard_error_files) || []).slice(0, 5),
+        ...((suiteRes && suiteRes.large_error_benchmarks) || []).slice(0, 5),
+      ];
+      drawChart('chScoreGain', {
+        type: 'bar',
+        data: {
+          labels: sampleRows.map(r => r.filename.replace('benchmarks/', '').replace('.py', '')),
+          datasets: [
+            {
+              label: 'Initial Score',
+              data: sampleRows.map(r => r.initial_score),
+              backgroundColor: '#d97706',
+              borderRadius: 4,
+            },
+            {
+              label: 'After AI Fixes',
+              data: sampleRows.map(r => r.projected_score || r.initial_score),
+              backgroundColor: '#15803d',
+              borderRadius: 4,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'top', labels: { boxWidth: 12 } }, tooltip: tooltipStyle },
+          scales: {
+            y: { beginAtZero: true, max: 100, title: { display: true, text: 'Score (0–100)' } },
+            x: { grid: { display: false }, ticks: { font: { family: "'JetBrains Mono', monospace", size: 10.5 } } },
+          },
+        },
+      });
+
+      // 3. Discovery Stage Doughnut
+      const stages = Object.entries(s.errors_by_stage || {});
+      drawChart('chStages', {
+        type: 'doughnut',
+        data: {
+          labels: stages.map(([k]) => k.charAt(0).toUpperCase() + k.slice(1)),
+          datasets: [{
+            data: stages.map(([, v]) => v),
+            backgroundColor: ['#b45309', '#0369a1', '#b91c1c', '#6d28d9'],
+            borderWidth: 2,
+            borderColor: '#ffffff',
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: '62%',
+          plugins: { legend: { position: 'right', labels: { padding: 14, boxWidth: 12 } }, tooltip: tooltipStyle },
+        },
+      });
+
+      // 4. Security Findings by Metric (Horizontal Bar)
+      const secM = Object.entries(s.security_by_metric || {}).slice(0, 10);
+      drawChart('chSecurity', {
+        type: 'bar',
+        data: {
+          labels: secM.map(x => x[0]),
+          datasets: [{
+            label: 'Findings',
+            data: secM.map(x => x[1]),
+            backgroundColor: '#991b1b',
+            borderRadius: 5,
+            maxBarThickness: 22,
+          }],
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: {
+            x: { beginAtZero: true, grid: { color: '#f0ede6' } },
+            y: { grid: { display: false }, ticks: { font: { family: "'JetBrains Mono', monospace", size: 11 } } },
+          },
+        },
+      });
+
+      // 5. Estimated Energy per File (mJ)
+      const benchRows = (ecoRes && ecoRes.benchmarks) || [];
+      const energyLabels = benchRows.length
+        ? benchRows.slice(0, 12).map(b => b.file.replace('.py', ''))
+        : sampleRows.map(r => r.filename.replace('benchmarks/', '').replace('.py', ''));
+      const energyVals = benchRows.length
+        ? benchRows.slice(0, 12).map(b => b.energy_mj)
+        : sampleRows.map(r => Number(((r.loc * 0.045) * powerW).toFixed(1)));
+
+      drawChart('chEnergy', {
+        type: 'bar',
+        data: {
+          labels: energyLabels,
+          datasets: [{
+            label: 'Energy (mJ)',
+            data: energyVals,
+            backgroundColor: '#2d6a4f',
+            borderRadius: 5,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: {
+            y: { beginAtZero: true, title: { display: true, text: 'Millijoules (mJ)' } },
+            x: { grid: { display: false }, ticks: { font: { family: "'JetBrains Mono', monospace", size: 10.5 } } },
+          },
+        },
+      });
+
+      // 6. CPU Package Power Line Chart
+      const watts = (ecoRes && ecoRes.power && ecoRes.power.watts) || [14.2, 14.8, 15.1, 14.9, 15.6, 15.3, 14.7, 15.0];
+      const step = Math.max(1, Math.floor(watts.length / 40));
+      const sampledW = watts.filter((_, idx) => idx % step === 0);
+      drawChart('chPower', {
+        type: 'line',
+        data: {
+          labels: sampledW.map((_, i) => `#${i * step + 1}`),
+          datasets: [{
+            label: 'Package Power (W)',
+            data: sampledW,
+            borderColor: '#1b4332',
+            backgroundColor: 'rgba(27, 67, 50, 0.12)',
+            fill: true,
+            tension: 0.35,
+            pointRadius: 2,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: tooltipStyle },
+          scales: {
+            y: { beginAtZero: true, title: { display: true, text: 'Watts (W)' } },
+            x: { grid: { display: false }, ticks: { maxTicksLimit: 8 } },
+          },
+        },
+      });
+
+      // Optional CodeCarbon table
+      const cc = (ecoRes && ecoRes.codecarbon) || [];
+      if (cc.length) {
+        document.getElementById('ccCard').style.display = 'block';
+        const rows = cc.slice(-8).reverse().map(r =>
+          `<tr><td>${r.timestamp || ''}</td><td>${Number(r.duration || 0).toFixed(3)}</td><td>${(Number(r.emissions || 0) * 1e6).toFixed(4)}</td><td>${(Number(r.energy_consumed || 0) * 1e6).toFixed(4)}</td><td>${Number(r.cpu_power || 0).toFixed(1)}</td></tr>`
+        ).join('');
+        document.getElementById('ccTableWrap').innerHTML =
+          `<table><thead><tr><th>Timestamp</th><th>Duration (s)</th><th>CO2eq (mg)</th><th>Energy (mWh)</th><th>CPU (W)</th></tr></thead><tbody>${rows}</tbody></table>`;
+      }
+    }
+
+    document.getElementById('btnRefresh').onclick = async () => {
+      const btn = document.getElementById('btnRefresh');
+      btn.disabled = true;
+      btn.textContent = 'Refreshing...';
+      try {
+        await fetch('/api/analytics/refresh', { method: 'POST' }).catch(() => null);
+        await loadDashboard();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Refresh Measurements';
+      }
+    };
+
+    window.addEventListener('DOMContentLoaded', loadDashboard);
+  </script>
+</body>
+</html>

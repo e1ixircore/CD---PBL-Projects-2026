@@ -1,0 +1,6 @@
+flask
+flask-cors
+codecarbon
+requests
+word2number
+libcst<1.9

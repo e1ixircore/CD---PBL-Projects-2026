@@ -1,0 +1,16 @@
+file,lines,truth,detected,stage,patches,verdict,detail,detect_ms,repair_ms,verify_ms,total_ms,est_energy_mJ
+test1.py,44,ZeroDivisionError,LogicalError,static,4,VERIFIED,"Patched code passes static analysis, security scan, and sandboxed execution.",1.61,62.4,52.84,116.85,975.38
+test2.py,29,SyntaxError,SyntaxError,parser,4,VERIFIED,"Patched code passes static analysis, security scan, and sandboxed execution.",0.74,121.05,53.48,175.27,1463.01
+test3.py,39,NameError,NameError,static,4,PARTIAL,1 static error(s) remain; first: NameError on line 29,1.01,61.59,1.12,63.73,531.91
+test4.py,33,IndexError,IndexError,static,4,VERIFIED,"Patched code passes static analysis, security scan, and sandboxed execution.",1.44,62.52,52.68,116.64,973.56
+test6.py,34,KeyError,KeyError,static,4,PARTIAL,1 static error(s) remain; first: LogicalError on line 22,0.74,55.24,0.77,56.75,473.73
+test7.py,36,TypeError,SyntaxError,parser,5,VERIFIED,"Patched code passes static analysis, security scan, and sandboxed execution.",0.8,118.11,50.98,169.9,1418.15
+test8.py,31,ModuleNotFoundError,ModuleNotFoundError,static,3,PARTIAL,1 static error(s) remain; first: ModuleNotFoundError on line 6,1.05,57.9,1.1,60.05,501.25
+testA.py,2,TimeoutError,TimeoutError,runtime,0,NO FIX GENERATED,No auto-fix rule for this error; explanation only.,5007.77,5008.29,0.01,10016.07,83604.13
+testB.py,10,TypeError,TypeError,static,3,VERIFIED,"Patched code passes static analysis, security scan, and sandboxed execution.",1.16,60.48,58.7,120.33,1004.38
+testC.py,21,NameError,NameError,static,12,VERIFIED,"Patched code passes static analysis, security scan, and sandboxed execution.",1.67,77.13,58.88,137.67,1149.15
+testD.py,10,NameError,NameError,static,4,VERIFIED,"Patched code passes static analysis, security scan, and sandboxed execution.",1.14,56.29,53.27,110.69,923.95
+testE.py,557,SyntaxError,SyntaxError,parser,3,PARTIAL,1 static error(s) remain; first: NameError on line 27,8.05,372.09,31.77,411.91,3438.25
+testF.py,503,IndexError,IndexError,static,2,PARTIAL,1 static error(s) remain; first: ModuleNotFoundError on line 28,23.97,343.96,21.85,389.78,3253.48
+testG.py,7,ValueError,ValueError,static,1,VERIFIED,"Patched code passes static analysis, security scan, and sandboxed execution.",0.73,52.24,49.35,102.32,854.08
+test_case_large.py,241,NameError,NameError,static,0,NO FIX GENERATED,No auto-fix rule for this error; explanation only.,7.19,107.53,0.01,114.74,957.7
