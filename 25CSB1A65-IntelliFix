@@ -1,1 +1,170 @@
+# IntelliFix (TOACD Studio)
+
+IntelliFix is a local Flask web studio for diagnosing, explaining, repairing, and
+hardening **Python** and **C++** source code. It combines deterministic AST/CST
+static analysis, compiler checks (`g++`/`clang++ -fsyntax-only`), a 52-metric
+security engine, sandboxed execution, and lossless LibCST patch synthesis—running
+fully offline by default, with optional LLM synthesis when configured.
+
+## What it does
+
+When you analyze a sample or uploaded Python (`.py`) or C++ (`.cpp`, `.cc`, `.cxx`)
+file, the pipeline streams live progress over Server-Sent Events (SSE) and:
+
+1. **Security Audit & Hardening (52 Metrics)**: Scans the source via
+   `security_metrics_engine.py` and `security_analyzer.py`. Critical/high
+   findings block unsafe execution and generate LibCST-hardened remediation
+   patches.
+2. **Syntax & Static Analysis**:
+   - **Python**: Checks syntax, undefined names, type mismatches, out-of-bounds
+     indexing, division by zero, and related semantic bugs via `static_analyzer.py`.
+   - **C++**: Runs the host C++ compiler with `-fsyntax-only -Wall -Wextra -std=c++17`
+     via `cpp_extractor.py` and maps diagnostics to structured explanations and
+     fixes via `cpp_explainer.py`.
+3. **Sandboxed Runtime Verification**: When Python code parses cleanly and passes
+   security gates, executes it inside the multi-engine sandbox (`sandbox.py`) with
+   strict time, memory, filesystem, and network isolation to catch runtime
+   exceptions.
+4. **Lossless Patching & Agentic Repair Loop**:
+   - Proposes readable **Mistake / Why / Fix** explanations alongside unified
+     diffs for each diagnostic card.
+   - Applies individual card fixes via `POST /api/apply-patch` using **LibCST**
+     (`cst_patcher.py`) to preserve comments, multi-line expressions, and mixed
+     tabs/spaces, with an indentation- and comment-preserving fallback when an
+     unrelated `SyntaxError` exists elsewhere in the file.
+   - Runs a bounded iterative repair loop (`agentic_compiler.py` / `app.py`, up
+     to 100 attempts within a 60-second budget), rejecting candidate patches that
+     introduce new vulnerabilities or regressions.
+
+## Requirements and startup
+
+Use Python 3.9+ with `pip`, then install dependencies from the project root:
+
+```bash
+python -m pip install -r requirements.txt
+python gui.py
+```
+
+Open [http://127.0.0.1:5001](http://127.0.0.1:5001) in your browser. The app
+binds to `127.0.0.1` on port `5001` (or automatically falls back to `5003`–`5005`
+if `5001` is busy). You can also start the Flask app directly:
+
+```bash
+python app.py
+```
+
+To stop the server, press `Ctrl+C` in the terminal.
+
+## Using the web studio
+
+- **Files & Uploads**: Open **☰ Files** to filter samples (`All`, `Errors`,
+  `Security`) or click **Upload .py / .cpp**. Uploaded files are stored in the
+  working directory with a `test_upload_` prefix and are never executed until you
+  explicitly analyze or run them.
+- **Language Selector**: Defaults to `Auto` (detects Python vs. C++ from filename
+  and code), or switch explicitly to `Python` or `C++`.
+- **Analyze / Re-analyze**: Runs the SSE-streaming pipeline and populates the
+  3-pillar score header (**Security /40**, **Errors /45**, **Efficiency /15**),
+  **Diagnostics** cards, **Pipeline** agent trace, and **Output** terminal.
+- **Applying Fixes**:
+  - Click **Apply Rule Fix** on any individual diagnostic card to apply that
+    single patch via `/api/apply-patch`.
+  - Click **Edit** on a card to modify the line inline, or **+ Line above L…**
+    to insert a new line directly in the editor.
+  - Click **Apply N Auto-Patches** in the diagnostics toolbar to apply all
+    verified fixes at once and re-run the pipeline.
+  - Use **↶ Undo** (`Cmd/Ctrl+Z`) to revert edits.
+- **Run & Save**: **Run** executes the current code in the sandbox (or compiles
+  and runs C++); **Save** writes a separate `*_fixed.py` / `*_fixed.cpp` file
+  without overwriting the original sample.
+- **Navigation**: Switch between **Studio** (`/`), **Suites** (`/suite-report`),
+  and **Eco Dashboard** (`/analytics`) in the top bar.
+
+## Metrics & CodeCarbon
+
+The analysis view reports measured execution time and CodeCarbon energy/emissions
+when enabled. To track CodeCarbon emissions for the lifetime of the server,
+start with:
+
+```bash
+USE_CODECARBON=1 python gui.py
+```
+
+The server prints its total measured emissions in mg CO2-eq on exit (including
+`Ctrl+C`) and writes to `emissions.csv`, which `/analytics` reads.
+
+## API routes
+
+| Route | Purpose |
+|---|---|
+| `GET /` | Main IntelliFix web studio |
+| `GET /suite-report` | Benchmark & suite evaluation report view |
+| `GET /analytics` | Eco & telemetry analytics dashboard |
+| `GET /api/files` | List available sample, benchmark, and fixed files |
+| `GET /api/source?filename=...` | Read an allowed source file |
+| `POST /api/file` | Read an allowed file (used by the web UI) |
+| `POST /api/analyze` | Security scan, diagnose, explain, and synthesize fixes (JSON or SSE stream) |
+| `POST /api/analyze/stream` | Explicit SSE streaming analysis endpoint |
+| `POST /api/apply-patch` | Apply a single diagnostic card patch via LibCST (with line fallback) |
+| `POST /api/agentic-compile` | Run the multi-agent compile-and-harden coordinator |
+| `POST /api/security-metrics` | Run the 52-metric security analysis engine |
+| `POST /api/execute` | Security scan and execute submitted Python or C++ code |
+| `POST /api/save` | Save code as a separate fixed file or create a named file |
+| `POST /api/upload` | Save an uploaded `.py` / `.cpp` file without executing it |
+| `GET /api/suite-report` | Return structured suite benchmark report data |
+| `GET /api/analytics` | Return eco/analytics dashboard data |
+| `POST /api/analytics/refresh` | Refresh analytics metrics |
+| `GET /api/sandbox/status` | Inspect active sandbox engine, isolation boundaries, and capabilities |
+
+All code-accepting endpoints enforce a 100 KB input size limit.
+
+## Project files
+
+- `app.py` — Flask application, REST/SSE routes, repair loop, and fix verification
+- `gui.py` — local web server launcher
+- `cst_patcher.py` — LibCST lossless code mutation, security hardening, and single-issue patch engine
+- `agentic_compiler.py` — multi-iteration agentic compiler & hardening coordinator
+- `security_metrics_engine.py` — 52-metric security analysis & risk scoring engine
+- `security_analyzer.py` — AST-based checks for critical risky patterns
+- `static_analyzer.py` — Python AST-based static checks
+- `error_extractor.py` — Python error extraction and sandboxed execution
+- `cpp_extractor.py` — C++ compiler diagnostic extraction (`g++`/`clang++`)
+- `cpp_explainer.py` — C++ error explanations and rule-based fixes
+- `ir_generator.py` — structured diagnostic intermediate representation
+- `nlp_explainer.py` — deterministic rule-based explanations and Python fixes
+- `sandbox.py` — multi-engine secure sandbox (macOS Seatbelt, Docker/gVisor, CPython audit hooks)
+- `sandbox_profile.sb` — Apple Seatbelt profile (`.sb`) for kernel containment
+- `templates/` — `index.html` (Studio), `suite_report.html` (Suites), and `analytics.html` (Eco Dashboard)
+- `tests/` — pytest unit, CST patcher, security metrics, and repair regression suites
+- `test_sandbox.py` — sandbox isolation and attack containment test suite
+- `test*.py`, `test_cpp_*.cpp`, `benchmarks/` — sample Python/C++ files and benchmark suites
+- `generate_benchmarks.py`, `generate_suite_report.py`, `run_benchmark_and_plots.py` — benchmark generation and reporting scripts
+
+## Sandboxing and Security Architecture
+
+TOACD utilizes a multi-layered, defense-in-depth **Sandbox Engine** (`sandbox.py`) to execute untrusted code without exposing the host system:
+
+1. **macOS Native Seatbelt (`sandbox-exec` with `.sb` profile)**:
+   - **Kernel-Enforced Mandatory Access Control (MAC)** via Apple Seatbelt Profile Language (`sandbox_profile.sb`).
+   - **Zero Network Access**: Disables outbound and inbound socket creation (`(deny network*)`).
+   - **Read-Only Host Filesystem**: Denies arbitrary file writes globally (`(deny file-write*)`); writes are confined to isolated ephemeral scratch directories.
+   - **Credential Protection**: Blocks reading sensitive configs, keys, and dotfiles (`~/.ssh`, `~/.aws`, `~/.gnupg`, `~/.bash_history`, `~/.zsh_history`, `/Library/Keychains`).
+   - **Restricted Process Execution**: Whitelists only designated runtime binaries.
+
+2. **Ephemeral Docker / gVisor Container Engine**:
+   - For containerized or Linux deployments, untrusted code runs in ephemeral containers (`--rm -i --network none --read-only --user 1000:1000 --cap-drop ALL --memory 256m --cpus 1.0`).
+   - Supports optional gVisor (`--runtime runsc`) for syscall interception.
+
+3. **In-Process Defense-in-Depth (Audit Hooks & POSIX Resource Limits)**:
+   - CPython 3.8+ audit hooks (`sys.addaudithook`) intercept subprocess calls (`subprocess.Popen`, `os.system`), network activity (`socket.*`), `ctypes` tampering, and sensitive path access.
+   - POSIX `resource.setrlimit` enforces hard CPU (`RLIMIT_CPU`), virtual memory (`RLIMIT_AS`), file write size (`RLIMIT_FSIZE`), and descriptor (`RLIMIT_NOFILE`) limits.
+
+## Testing & CI
+
+Run the full test suite with `pytest` (also executed automatically in GitHub Actions across Python 3.9–3.12 via `.github/workflows/ci.yml`):
+
+```bash
+pytest -v tests/
+pytest -v test_sandbox.py
+```
 
